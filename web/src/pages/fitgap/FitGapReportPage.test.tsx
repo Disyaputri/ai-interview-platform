@@ -1,9 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import FitGapReportPage from "./FitGapReportPage";
 import { portfoliosApi } from "@/services/portfolios";
 import { sessionsApi } from "@/services/sessions";
+
+// Polling dimatikan di tes. Satu putaran polling ditiru dengan memanggil fungsinya langsung.
+const polling = vi.hoisted(() => ({
+  fn: null as null | (() => void | Promise<void>),
+}));
+
+vi.mock("@/hooks/usePolling", () => ({
+  usePolling: (fn: () => void | Promise<void>) => {
+    polling.fn = fn;
+  },
+}));
 
 vi.mock("@/services/sessions", () => ({
   sessionsApi: { getPortfolio: vi.fn() },
@@ -60,6 +71,7 @@ function tampilkanHalaman() {
 describe("FitGapReportPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    polling.fn = null;
     vi.mocked(sessionsApi.getPortfolio).mockResolvedValue({
       data: { portfolio: portofolio },
     } as never);
@@ -107,6 +119,45 @@ describe("FitGapReportPage", () => {
 
     const peringatan = await screen.findByRole("alert");
     expect(peringatan.textContent).toMatch(/portfolio is not ready/i);
+  });
+
+  it("tidak memicu pembuatan laporan lagi saat polling masih menunggu", async () => {
+    vi.mocked(portfoliosApi.getFitGap).mockRejectedValue(galat(404));
+    vi.mocked(portfoliosApi.triggerFitGap).mockResolvedValue({
+      data: { status: "generating" },
+    } as never);
+
+    tampilkanHalaman();
+
+    expect(await screen.findByText(/generating fit\/gap report/i)).toBeTruthy();
+    expect(vi.mocked(portfoliosApi.triggerFitGap)).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await polling.fn?.();
+      await polling.fn?.();
+    });
+
+    expect(vi.mocked(portfoliosApi.triggerFitGap)).toHaveBeenCalledTimes(1);
+  });
+
+  it("tidak memicu pembuatan ganda saat menunggu hasil regenerate", async () => {
+    vi.mocked(portfoliosApi.getFitGap)
+      .mockResolvedValueOnce({ data: { report: laporan } } as never)
+      .mockRejectedValue(galat(404));
+    vi.mocked(portfoliosApi.regenerateFitGap).mockResolvedValue({
+      data: { status: "generating" },
+    } as never);
+
+    tampilkanHalaman();
+
+    fireEvent.click(await screen.findByRole("button", { name: /regenerate/i }));
+    expect(await screen.findByText(/generating fit\/gap report/i)).toBeTruthy();
+
+    await act(async () => {
+      await polling.fn?.();
+    });
+
+    expect(vi.mocked(portfoliosApi.triggerFitGap)).not.toHaveBeenCalled();
   });
 
   it("tombol coba lagi memuat ulang dan menampilkan laporan", async () => {
