@@ -8,7 +8,7 @@ import ComparisonTable from "@/components/fitgap/ComparisonTable";
 import { portfoliosApi } from "@/services/portfolios";
 import { sessionsApi } from "@/services/sessions";
 import { usePolling } from "@/hooks/usePolling";
-import { ArrowLeft, Download, Loader2, RefreshCw, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, Loader2, RefreshCw, Zap } from "lucide-react";
 import type { FitGapReport, Portfolio } from "@/types";
 
 export default function FitGapReportPage() {
@@ -24,6 +24,8 @@ export default function FitGapReportPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<"pdf" | "json" | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const fetchReport = useCallback(async () => {
     if (!portfolio) return;
@@ -31,6 +33,7 @@ export default function FitGapReportPage() {
       const res = await portfoliosApi.getFitGap(portfolio.id, Number(vacancyId));
       setReport(res.data.report);
       setGenerating(false);
+      setError(null);
     } catch (e: any) {
       if (e?.response?.status === 404) {
         try {
@@ -38,28 +41,42 @@ export default function FitGapReportPage() {
           setGenerating(true);
         } catch {
           setGenerating(false);
+          setError("Could not start generating the fit/gap report. Please try again.");
         }
+      } else {
+        setGenerating(false);
+        setError("Could not load the fit/gap report. Please try again.");
       }
     }
   }, [portfolio, vacancyId]);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
+    setPortfolio(null);
+    setReport(null);
+    setGenerating(false);
     sessionsApi
       .getPortfolio(Number(sessionId))
-      .then(async (res) => {
+      .then((res) => {
         const data = res.data as any;
         if (data.portfolio) {
           setPortfolio(data.portfolio);
+        } else {
+          setError("The candidate portfolio is not ready yet. Please try again in a moment.");
         }
       })
+      .catch(() => setError("Could not load the candidate portfolio. Please try again."))
       .finally(() => setLoading(false));
-  }, [sessionId]);
+  }, [sessionId, reloadKey]);
 
   useEffect(() => {
     if (portfolio) fetchReport();
   }, [portfolio, fetchReport]);
 
   usePolling(fetchReport, 5000, generating && !!portfolio);
+
+  const handleRetry = () => setReloadKey((k) => k + 1);
 
   const handleRegenerate = async () => {
     if (!portfolio) return;
@@ -139,6 +156,17 @@ export default function FitGapReportPage() {
           </div>
         )}
       </div>
+
+      {/* Error */}
+      {error && (
+        <div role="alert" className="border border-destructive/30 bg-destructive/5 rounded-lg p-8 text-center space-y-3">
+          <AlertTriangle className="h-6 w-6 text-destructive mx-auto" />
+          <p className="text-sm text-foreground">{error}</p>
+          <Button variant="outline" size="sm" onClick={handleRetry}>
+            Try again
+          </Button>
+        </div>
+      )}
 
       {/* Generating */}
       {generating && (
