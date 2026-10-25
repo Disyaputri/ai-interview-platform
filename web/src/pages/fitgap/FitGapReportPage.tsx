@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,8 @@ export default function FitGapReportPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Menandai bahwa pembuatan laporan sudah dipicu, supaya polling tidak memicunya lagi.
+  const generationTriggered = useRef(false);
 
   const fetchReport = useCallback(async () => {
     if (!portfolio) return;
@@ -34,15 +36,21 @@ export default function FitGapReportPage() {
       setReport(res.data.report);
       setGenerating(false);
       setError(null);
+      generationTriggered.current = false;
     } catch (e: any) {
       if (e?.response?.status === 404) {
-        try {
-          await portfoliosApi.triggerFitGap(portfolio.id, Number(vacancyId));
-          setGenerating(true);
-        } catch {
-          setGenerating(false);
-          setError("Could not start generating the fit/gap report. Please try again.");
+        if (!generationTriggered.current) {
+          generationTriggered.current = true;
+          try {
+            await portfoliosApi.triggerFitGap(portfolio.id, Number(vacancyId));
+          } catch {
+            generationTriggered.current = false;
+            setGenerating(false);
+            setError("Could not start generating the fit/gap report. Please try again.");
+            return;
+          }
         }
+        setGenerating(true);
       } else {
         setGenerating(false);
         setError("Could not load the fit/gap report. Please try again.");
@@ -53,6 +61,7 @@ export default function FitGapReportPage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
+    generationTriggered.current = false;
     setPortfolio(null);
     setReport(null);
     setGenerating(false);
@@ -83,6 +92,7 @@ export default function FitGapReportPage() {
     setRegenerating(true);
     try {
       await portfoliosApi.regenerateFitGap(portfolio.id, Number(vacancyId));
+      generationTriggered.current = true;
       setReport(null);
       setGenerating(true);
     } finally {
