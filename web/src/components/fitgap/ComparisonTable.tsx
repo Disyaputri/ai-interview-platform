@@ -49,20 +49,20 @@ export default function ComparisonTable({ comparisons }: ComparisonTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50">
-              <th className="text-left px-4 py-2.5 font-medium">Skill</th>
-              <th className="text-center px-4 py-2.5 font-medium">Required</th>
-              <th className="text-center px-4 py-2.5 font-medium">Candidate</th>
-              <th className="text-center px-4 py-2.5 font-medium">Result</th>
+              <th className="text-left px-2 sm:px-4 py-2.5 font-medium">Skill</th>
+              <th className="text-center px-2 sm:px-4 py-2.5 font-medium">Required</th>
+              <th className="text-center px-2 sm:px-4 py-2.5 font-medium">Candidate</th>
+              <th className="text-center px-2 sm:px-4 py-2.5 font-medium">Result</th>
             </tr>
           </thead>
           <tbody>
             {comparisons.map((c, i) => (
               <tr key={i} className="border-b last:border-0">
-                <td className="px-4 py-2.5 break-words">{c.skill_label}</td>
-                <td className="px-4 py-2.5 text-center text-muted-foreground">
+                <td className="px-2 sm:px-4 py-2.5 break-words">{c.skill_label}</td>
+                <td className="px-2 sm:px-4 py-2.5 text-center text-muted-foreground">
                   {levelLabel(c.expected_level)}
                 </td>
-                <td className="px-4 py-2.5 text-center">
+                <td className="px-2 sm:px-4 py-2.5 text-center">
                   {c.candidate_level != null ? (
                     <span>
                       {levelLabel(c.candidate_level)}
@@ -75,7 +75,7 @@ export default function ComparisonTable({ comparisons }: ComparisonTableProps) {
                     <span className="text-muted-foreground">—</span>
                   )}
                 </td>
-                <td className="px-4 py-2.5 text-center">
+                <td className="px-2 sm:px-4 py-2.5 text-center">
                   <ResultBadge comparison={c} />
                 </td>
               </tr>
